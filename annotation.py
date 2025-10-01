@@ -70,7 +70,7 @@ def annotate_celltypist(adata, model: str = 'Immune_All_Low.pkl',
                     adata_batch, 
                     model=ct_model,
                     majority_voting=majority_voting,
-                    use_gpu=use_gpu
+                    use_GPU=use_gpu  # CellTypist uses capital GPU
                 )
                 
                 # Store predictions in order
@@ -98,7 +98,7 @@ def annotate_celltypist(adata, model: str = 'Immune_All_Low.pkl',
                 adata, 
                 model=ct_model,
                 majority_voting=majority_voting,
-                use_gpu=use_gpu
+                use_GPU=use_gpu  # CellTypist uses capital GPU
             )
             
             # Store predictions
