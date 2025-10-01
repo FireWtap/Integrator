@@ -116,8 +116,13 @@ def main():
         # Transfer annotations back to original adata
         if 'celltypist_predicted' in adata_for_annotation.obs:
             adata.obs['celltypist_predicted'] = adata_for_annotation.obs['celltypist_predicted']
+            
+            # Transfer majority voting results if they exist
             if 'celltypist_majority_voting' in adata_for_annotation.obs:
                 adata.obs['celltypist_majority_voting'] = adata_for_annotation.obs['celltypist_majority_voting']
+            
+            # Transfer confidence scores if they exist
+            if 'celltypist_conf_score' in adata_for_annotation.obs:
                 adata.obs['celltypist_conf_score'] = adata_for_annotation.obs['celltypist_conf_score']
             
             # Use CellTypist predictions as label_key if not provided
