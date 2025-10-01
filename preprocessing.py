@@ -7,6 +7,13 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from pathlib import Path
 
+# Try to import GPU-accelerated scanpy
+try:
+    import rapids_singlecell as rsc
+    RAPIDS_AVAILABLE = True
+except ImportError:
+    RAPIDS_AVAILABLE = False
+
 
 def load_data(file_path: str):
     """Load h5ad file."""
@@ -107,9 +114,10 @@ def quality_control(adata, output_dir: str = "qc_plots"):
 
 
 def preprocess_data(adata, normalize: bool = True, hvg: bool = True, 
-                   n_top_genes: int = 2000, scale: bool = True):
+                   n_top_genes: int = 2000, scale: bool = True, use_gpu: bool = True):
     """
     Preprocess scRNA-seq data following best practices.
+    GPU-accelerated if rapids-singlecell is available.
     
     Args:
         adata: AnnData object
@@ -117,8 +125,19 @@ def preprocess_data(adata, normalize: bool = True, hvg: bool = True,
         hvg: Whether to select highly variable genes
         n_top_genes: Number of HVGs to select
         scale: Whether to scale data
+        use_gpu: Whether to use GPU acceleration (if available)
     """
     print("\n=== Preprocessing ===")
+    
+    # Check if we can use GPU
+    use_rapids = use_gpu and RAPIDS_AVAILABLE
+    if use_rapids:
+        print("✓ Using GPU-accelerated preprocessing (rapids-singlecell)")
+    else:
+        if use_gpu and not RAPIDS_AVAILABLE:
+            print("⚠ rapids-singlecell not available, using CPU")
+        else:
+            print("Using CPU preprocessing")
     
     # Store raw counts
     adata.layers['counts'] = adata.X.copy()
@@ -126,26 +145,42 @@ def preprocess_data(adata, normalize: bool = True, hvg: bool = True,
     # Normalize if needed
     if normalize:
         print("Normalizing to 10,000 counts per cell...")
-        sc.pp.normalize_total(adata, target_sum=1e4)
-        print("Log-transforming...")
-        sc.pp.log1p(adata)
+        if use_rapids:
+            rsc.pp.normalize_total(adata, target_sum=1e4)
+            print("Log-transforming...")
+            rsc.pp.log1p(adata)
+        else:
+            sc.pp.normalize_total(adata, target_sum=1e4)
+            print("Log-transforming...")
+            sc.pp.log1p(adata)
     
     # Highly variable genes
     if hvg:
         print(f"Selecting {n_top_genes} highly variable genes...")
-        sc.pp.highly_variable_genes(adata, n_top_genes=n_top_genes, 
-                                    subset=False, flavor='seurat_v3', 
-                                    layer='counts')
+        if use_rapids:
+            rsc.pp.highly_variable_genes(adata, n_top_genes=n_top_genes, 
+                                        subset=False, flavor='seurat_v3', 
+                                        layer='counts')
+        else:
+            sc.pp.highly_variable_genes(adata, n_top_genes=n_top_genes, 
+                                        subset=False, flavor='seurat_v3', 
+                                        layer='counts')
         print(f"✓ Found {adata.var['highly_variable'].sum()} HVGs")
     
     # Scale data
     if scale:
         print("Scaling data...")
-        sc.pp.scale(adata, max_value=10)
+        if use_rapids:
+            rsc.pp.scale(adata, max_value=10)
+        else:
+            sc.pp.scale(adata, max_value=10)
     
     # PCA
     print("Computing PCA...")
-    sc.tl.pca(adata, svd_solver='arpack')
+    if use_rapids:
+        rsc.tl.pca(adata, svd_solver='arpack')
+    else:
+        sc.tl.pca(adata, svd_solver='arpack')
     
     print("✓ Preprocessing complete")
     return adata

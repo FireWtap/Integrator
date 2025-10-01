@@ -105,8 +105,13 @@ def main():
             sc.pp.normalize_total(adata_for_annotation, target_sum=1e4)
             sc.pp.log1p(adata_for_annotation)
         
-        # Run CellTypist annotation
-        adata_for_annotation = annotate_celltypist(adata_for_annotation, model=args.celltypist_model)
+        # Run CellTypist annotation (batch-wise processing)
+        adata_for_annotation = annotate_celltypist(
+            adata_for_annotation, 
+            model=args.celltypist_model,
+            batch_key=args.batch_key,
+            use_gpu=True
+        )
         
         # Transfer annotations back to original adata
         if 'celltypist_predicted' in adata_for_annotation.obs:

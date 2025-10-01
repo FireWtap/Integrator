@@ -13,3 +13,5 @@ matplotlib>=3.5.0
 seaborn>=0.11.0
 scikit-learn>=1.0.0
 scipy>=1.7.0
+torch>=2.0.0
+rapids-singlecell>=0.9.0  # GPU-accelerated scanpy operations (optional)

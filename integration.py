@@ -8,7 +8,7 @@ import warnings
 
 
 def integrate_scgen(adata, batch_key: str, label_key: Optional[str] = None, 
-                   max_epochs: int = 100):
+                   max_epochs: int = 100, use_gpu: bool = True):
     """
     Integrate using scGen (conditional VAE).
     Returns integrated expression matrix in adata.obsm['X_scgen'].
@@ -18,6 +18,7 @@ def integrate_scgen(adata, batch_key: str, label_key: Optional[str] = None,
         batch_key: Column name for batch information
         label_key: Column name for cell type labels (optional)
         max_epochs: Maximum training epochs
+        use_gpu: Whether to use GPU acceleration
     
     Returns:
         adata: Updated AnnData object
@@ -27,6 +28,15 @@ def integrate_scgen(adata, batch_key: str, label_key: Optional[str] = None,
     
     try:
         from scgen import SCGEN
+        import torch
+        
+        # Check GPU
+        if use_gpu and torch.cuda.is_available():
+            print(f"✓ Using GPU: {torch.cuda.get_device_name(0)}")
+            accelerator = 'gpu'
+        else:
+            print("Using CPU")
+            accelerator = 'cpu'
         
         # Use raw counts for scGen
         if 'counts' in adata.layers:
@@ -37,13 +47,14 @@ def integrate_scgen(adata, batch_key: str, label_key: Optional[str] = None,
         
         print(f"Training scGen model (max_epochs={max_epochs})...")
         
-        # Train scGen model
+        # Train scGen model with GPU support
         model = SCGEN(adata_scgen, batch_key=batch_key, cell_type_key=label_key)
         model.train(
             max_epochs=max_epochs,
-            batch_size=32,
+            batch_size=128 if accelerator == 'gpu' else 32,
             early_stopping=True,
-            early_stopping_patience=25
+            early_stopping_patience=25,
+            accelerator=accelerator
         )
         
         # Get corrected expression
@@ -125,7 +136,7 @@ def integrate_lemur(adata, batch_key: str, n_embedding: int = 30):
             return adata
 
 
-def integrate_scvi(adata, batch_key: str, n_latent: int = 30, max_epochs: int = 400):
+def integrate_scvi(adata, batch_key: str, n_latent: int = 30, max_epochs: int = 400, use_gpu: bool = True):
     """
     Integrate using scVI (variational inference).
     Returns integrated latent representation in adata.obsm['X_scvi'].
@@ -135,6 +146,7 @@ def integrate_scvi(adata, batch_key: str, n_latent: int = 30, max_epochs: int = 
         batch_key: Column name for batch information
         n_latent: Dimension of latent space
         max_epochs: Maximum training epochs
+        use_gpu: Whether to use GPU acceleration
     
     Returns:
         adata: Updated AnnData object
@@ -144,6 +156,15 @@ def integrate_scvi(adata, batch_key: str, n_latent: int = 30, max_epochs: int = 
     
     try:
         import scvi
+        import torch
+        
+        # Check GPU
+        if use_gpu and torch.cuda.is_available():
+            print(f"✓ Using GPU: {torch.cuda.get_device_name(0)}")
+            accelerator = 'gpu'
+        else:
+            print("Using CPU")
+            accelerator = 'cpu'
         
         # Setup scVI model
         print(f"Setting up scVI model (n_latent={n_latent})...")
@@ -164,7 +185,12 @@ def integrate_scvi(adata, batch_key: str, n_latent: int = 30, max_epochs: int = 
         model = scvi.model.SCVI(adata_scvi, n_latent=n_latent)
         
         print(f"Training scVI model (max_epochs={max_epochs})...")
-        model.train(max_epochs=max_epochs, early_stopping=True)
+        model.train(
+            max_epochs=max_epochs, 
+            early_stopping=True,
+            accelerator=accelerator,
+            batch_size=256 if accelerator == 'gpu' else 128
+        )
         
         # Get latent representation
         print("Generating latent representation...")
@@ -313,9 +339,9 @@ def integrate_combat(adata, batch_key: str):
 
 
 def run_all_integrations(adata, batch_key: str, label_key: Optional[str] = None,
-                        methods: list = None):
+                        methods: list = None, use_gpu: bool = True):
     """
-    Run all available integration methods.
+    Run all available integration methods with GPU acceleration.
     
     Args:
         adata: AnnData object (preprocessed)
@@ -323,9 +349,23 @@ def run_all_integrations(adata, batch_key: str, label_key: Optional[str] = None,
         label_key: Column name for cell type labels
         methods: List of methods to run. 
                 Default: ['scgen', 'scanorama', 'harmony', 'combat', 'scvi']
+        use_gpu: Whether to use GPU acceleration (where available)
     """
     if methods is None:
         methods = ['scgen', 'scanorama', 'harmony', 'combat', 'scvi']
+    
+    # Check GPU availability
+    try:
+        import torch
+        if use_gpu and torch.cuda.is_available():
+            print(f"\n🚀 GPU ACCELERATION ENABLED")
+            print(f"   Device: {torch.cuda.get_device_name(0)}")
+            print(f"   Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
+        else:
+            print(f"\n⚠ GPU not available, using CPU")
+    except:
+        print(f"\n⚠ PyTorch not available, using CPU")
+        use_gpu = False
     
     print(f"\n{'='*60}")
     print(f"Running integration methods: {', '.join(methods)}")
@@ -335,7 +375,7 @@ def run_all_integrations(adata, batch_key: str, label_key: Optional[str] = None,
     models = {}  # Store trained models
     
     if 'scgen' in methods:
-        adata, model = integrate_scgen(adata, batch_key, label_key)
+        adata, model = integrate_scgen(adata, batch_key, label_key, use_gpu=use_gpu)
         if 'X_scgen' in adata.obsm:
             results['scgen'] = 'X_scgen'
             models['scgen'] = model
@@ -361,7 +401,7 @@ def run_all_integrations(adata, batch_key: str, label_key: Optional[str] = None,
             results['lemur'] = 'X_lemur'
     
     if 'scvi' in methods:
-        adata, model = integrate_scvi(adata, batch_key)
+        adata, model = integrate_scvi(adata, batch_key, use_gpu=use_gpu)
         if 'X_scvi' in adata.obsm:
             results['scvi'] = 'X_scvi'
             models['scvi'] = model
