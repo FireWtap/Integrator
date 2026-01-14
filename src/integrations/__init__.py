@@ -1,4 +1,4 @@
-import src.utils.env_setup
+import utils.env_setup
 from .base import IntegrationMethod
 from .harmony import HarmonyIntegration
 from .scanorama import ScanoramaIntegration
