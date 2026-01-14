@@ -1,3 +1,4 @@
+import src.utils.env_setup
 import scanpy as sc
 import anndata as ad
 from typing import Union, Dict

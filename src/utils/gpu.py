@@ -2,6 +2,7 @@
 GPU utility module for device detection (CUDA/MPS).
 """
 
+import src.utils.env_setup
 import torch
 
 def is_gpu_available() -> bool:
