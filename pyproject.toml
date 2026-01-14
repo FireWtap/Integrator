@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "integratore"
+version = "0.1.0"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [
+    {name = "Francesco", email = "massafra32@gmail.com"}
+]
+dependencies = [
+    "scanpy>=1.9",
+    "anndata>=0.8",
+    "pandas",
+    "numpy",
+    "matplotlib",
+    "scvi-tools",
+    "scgen",
+    "harmony-pytorch",
+    "scanorama",
+    "celltypist",
+    "scib-metrics"
+]
+
+[project.optional-dependencies]
+gpu = [
+    "rapids-singlecell"
+]
+dev = [
+    "pytest",
+    "black",
+    "flake8"
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
