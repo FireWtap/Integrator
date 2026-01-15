@@ -3,7 +3,7 @@ import scanpy as sc
 import anndata as ad
 from typing import Union, Dict
 from .base import IntegrationMethod
-from utils.gpu import get_device, is_gpu_available, is_rapids_available
+from utils.gpu import get_device, is_gpu_available, is_rapids_available, print_device_info
 
 class HarmonyIntegration(IntegrationMethod):
     """
@@ -42,7 +42,9 @@ class HarmonyIntegration(IntegrationMethod):
         adata = self._prepare_input(adata, batch_key)
         
         device = get_device(self.use_gpu)
-        print(f"Running Harmony integration on '{batch_key}' (Target Device: {device})...")
+        print("\n--- Harmony Integration Setup ---")
+        print_device_info()
+        print(f"Target Device for Harmony: {device}")
         
         # Ensure PCA is computed
         if 'X_pca' not in adata.obsm:
