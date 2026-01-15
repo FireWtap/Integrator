@@ -1,4 +1,3 @@
-
 import scanpy as sc
 import anndata as ad
 import numpy as np
@@ -30,35 +29,25 @@ obs = pd.DataFrame({
 adata = ad.AnnData(X=X, obs=obs)
 adata.obsm['X_pca'] = np.random.rand(n_obs, n_pca)
 
-print("\n--- Testing scanpy.external.pp.harmony_integrate ---")
+print("\n--- Using harmony.harmonize directly (FIXED) ---")
 try:
-    sc.external.pp.harmony_integrate(adata, key='batch', basis='X_pca', adjusted_basis='X_pca_harmony')
-    print("Scanpy harmony_integrate SUCCESS")
-    print(f"Result shape: {adata.obsm['X_pca_harmony'].shape}")
+    # Use harmony.harmonize directly instead of broken scanpy wrapper
+    Z_corrected = harmony.harmonize(
+        adata.obsm['X_pca'], 
+        adata.obs, 
+        batch_key='batch'
+    )
+    adata.obsm['X_pca_harmony'] = Z_corrected
+    print("✓ Harmony integration SUCCESS")
+    print(f"✓ Result shape: {adata.obsm['X_pca_harmony'].shape}")
+    print(f"✓ Expected shape: ({n_obs}, {n_pca})")
 except Exception as e:
-    print(f"Scanpy harmony_integrate FAILED: {e}")
+    print(f"✗ Harmony integration FAILED: {e}")
     import traceback
     traceback.print_exc()
 
-print("\n--- Testing harmony.harmonize (if available) ---")
-if 'harmony' in locals() and hasattr(harmony, 'harmonize'):
-    try:
-        Z = harmony.harmonize(adata.obsm['X_pca'], adata.obs[['batch']], batch_key='batch')
-        print("harmony.harmonize SUCCESS")
-        print(f"Result shape: {Z.shape}")
-    except Exception as e:
-        print(f"harmony.harmonize FAILED: {e}")
-else:
-    print("harmony.harmonize NOT available.")
-
-print("\n--- Testing harmony.run_harmony (if available) ---")
-if 'harmony' in locals() and hasattr(harmony, 'run_harmony'):
-    try:
-        # harmonypy specific signature might be needed
-        # run_harmony(data_mat, meta_data, vars_use, ...)
-        # Just checking existence primarily
-        print("harmony.run_harmony exists.")
-    except Exception as e:
-        print(f"harmony.run_harmony FAILED: {e}")
-else:
-    print("harmony.run_harmony NOT available.")
+# Verify the result
+print("\n--- Verification ---")
+print(f"Original PCA shape: {adata.obsm['X_pca'].shape}")
+print(f"Harmony corrected shape: {adata.obsm['X_pca_harmony'].shape}")
+print(f"Batch distribution: {adata.obs['batch'].value_counts().to_dict()}")
