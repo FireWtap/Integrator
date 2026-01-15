@@ -10,8 +10,7 @@ matplotlib
 # pip install --extra-index-url=https://pypi.nvidia.com rapids-singlecell
 rapids-singlecell
 
-# Deep Learning Frameworks
-torch
+# Deep Learning Framework
 scvi-tools
 
 # Integration Methods
