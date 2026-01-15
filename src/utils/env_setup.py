@@ -7,6 +7,7 @@ os.environ["OMP_NUM_THREADS"] = "32"
 os.environ["MKL_NUM_THREADS"] = "32"
 os.environ["VECLIB_MAXIMUM_THREADS"] = "32"
 os.environ["NUMEXPR_NUM_THREADS"] = "32"
+os.environ["OPENBLAS_CORETYPE"] = "ARMV8"
 
 print("--- Environment Setup ---")
 for var in ['OPENBLAS_NUM_THREADS', 'OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'VECLIB_MAXIMUM_THREADS', 'NUMEXPR_NUM_THREADS']:
