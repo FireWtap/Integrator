@@ -1,0 +1,28 @@
+# Core Single-Cell Analysis
+scanpy>=1.9
+anndata>=0.8
+pandas
+numpy
+matplotlib
+
+# GPU & Acceleration (NVIDIA CUDA 12.5)
+# Note: For RAPIDS on pip, you often need the NVIDIA index:
+# pip install --extra-index-url=https://pypi.nvidia.com rapids-singlecell
+rapids-singlecell
+
+# Deep Learning Frameworks
+torch
+scvi-tools
+
+# Integration Methods
+harmony-pytorch
+scanorama
+# Custom scgen version as requested
+git+https://github.com/LouiseDck/scgen
+
+# Annotation & Metrics
+celltypist
+scib-metrics
+
+# Editable install of the current project
+-e .
