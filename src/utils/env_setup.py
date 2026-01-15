@@ -1,4 +1,15 @@
 import os
+import sys
+import warnings
+
+# Check if numpy is already loaded
+if 'numpy' in sys.modules:
+    warnings.warn(
+        "WARNING: 'numpy' is already imported! "
+        "Setting OPENBLAS_NUM_THREADS now may have NO EFFECT. "
+        "Ensure 'src.utils.env_setup' is imported BEFORE any other package (scanpy, numpy, pandas, etc.).",
+        RuntimeWarning
+    )
 
 # Set environment variables to limit threads before any other imports
 # This is critical to prevent segmentation faults with OpenBLAS/Harmony

@@ -46,6 +46,11 @@ class HarmonyIntegration(IntegrationMethod):
         print_device_info()
         print(f"Target Device for Harmony: {device}")
         
+        # Debug: Check thread settings
+        import os
+        print(f"DEBUG: OPENBLAS_NUM_THREADS={os.environ.get('OPENBLAS_NUM_THREADS')}")
+        print(f"DEBUG: OMP_NUM_THREADS={os.environ.get('OMP_NUM_THREADS')}")
+        
         # Ensure PCA is computed
         if 'X_pca' not in adata.obsm:
             print("PCA not found. Computing PCA...")
