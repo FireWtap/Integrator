@@ -24,3 +24,12 @@ print("--- Environment Setup ---")
 for var in ['OPENBLAS_NUM_THREADS', 'OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'VECLIB_MAXIMUM_THREADS', 'NUMEXPR_NUM_THREADS']:
     print(f"{var}: {os.environ.get(var)}")
 print("-------------------------")
+
+# Try to enforce using threadpoolctl (works even if libraries are already loaded)
+try:
+    from threadpoolctl import threadpool_limits
+    threadpool_limits(1)
+    print("✓ Enforced thread limits using threadpoolctl(1)")
+except ImportError:
+    print("Warning: threadpoolctl not found. Could not enforce runtime thread limits.")
+

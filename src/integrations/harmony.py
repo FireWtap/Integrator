@@ -75,7 +75,19 @@ class HarmonyIntegration(IntegrationMethod):
             # Run harmonize
             import traceback
             try:
-                Z_corr = harmonize(X, batch_mat, batch_key=batch_key, use_gpu=use_gpu_flag, **kwargs)
+                # Enforce thread limit strictly during this call using threadpoolctl
+                # This is the most reliable way to prevent OpenBLAS segfaults
+                try:
+                    from threadpoolctl import threadpool_limits
+                    ctx = threadpool_limits(limits=1, user_api='blas')
+                except ImportError:
+                    # nullcontext if threadpoolctl missing
+                    from contextlib import nullcontext
+                    ctx = nullcontext()
+
+                with ctx:
+                    Z_corr = harmonize(X, batch_mat, batch_key=batch_key, use_gpu=use_gpu_flag, **kwargs)
+                
                 adata.obsm['X_pca_harmony'] = Z_corr
                 print(f"✓ Harmony integration complete (Provider: harmony-pytorch, GPU: {use_gpu_flag}).")
                 return adata
