@@ -3,7 +3,7 @@ Data loader module for single-cell integration testing tool
 Handles loading and initial batch splitting of single-cell datasets
 """
 
-import utils.env_setup
+
 import scanpy as sc
 import pandas as pd
 import anndata as ad

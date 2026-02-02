@@ -1,42 +1,54 @@
-import utils.env_setup
+# CRITICAL: Set thread limits BEFORE any imports
+import os
+os.environ['OPENBLAS_NUM_THREADS'] = '1'
+os.environ['OMP_NUM_THREADS'] = '1'
+os.environ['MKL_NUM_THREADS'] = '1'
+
 import scanpy as sc
 import anndata as ad
 from typing import Union, Dict
 from .base import IntegrationMethod
 from utils.gpu import get_device, is_gpu_available, is_rapids_available, print_device_info
 
+
 class HarmonyIntegration(IntegrationMethod):
     """
-    Harmony integration wrapper.
-    Supports harmony-pytorch for GPU acceleration.
+    Harmony integration wrapper with fallback chain:
+    1. rapids-singlecell (GPU, fastest, no OpenBLAS issues)
+    2. harmony-pytorch (GPU/CPU, with thread safety)
+    3. scanpy/harmonypy (CPU fallback)
     """
     
     def __init__(self, use_gpu: bool = True):
         super().__init__("Harmony", use_gpu=use_gpu)
 
     def check_dependencies(self) -> bool:
-        # Check for harmony-pytorch (works on CPU/GPU) or harmony (CPU)
+        # Check in priority order
+        try:
+            import rapids_singlecell as rsc
+            return True
+        except ImportError:
+            pass
+        
         try:
             from harmony import harmonize
             return True
         except ImportError:
             pass
-
-        # Fallback check for scanpy's wrapper requirements
+        
         try:
             import harmonypy
             return True
         except ImportError:
             pass
 
-        print("Warning: Neither 'harmony-pytorch' nor 'harmonypy' package found.")
+        print("Warning: No Harmony implementation found (rapids_singlecell, harmony-pytorch, or harmonypy).")
         return False
 
     def run(self, adata: Union[ad.AnnData, Dict[str, ad.AnnData]], batch_key: str, **kwargs) -> ad.AnnData:
         """
-        Run Harmony integration.
-        Prioritizes harmony-pytorch if installed (faster, supports GPU/CPU).
-        Falls back to scanpy (harmonypy) otherwise.
+        Run Harmony integration with intelligent fallback.
+        Priority: rapids-singlecell > harmony-pytorch > scanpy/harmonypy
         """
         # Ensure single AnnData
         adata = self._prepare_input(adata, batch_key)
@@ -46,17 +58,33 @@ class HarmonyIntegration(IntegrationMethod):
         print_device_info()
         print(f"Target Device for Harmony: {device}")
         
-        # Debug: Check thread settings
-        import os
-        print(f"DEBUG: OPENBLAS_NUM_THREADS={os.environ.get('OPENBLAS_NUM_THREADS')}")
-        print(f"DEBUG: OMP_NUM_THREADS={os.environ.get('OMP_NUM_THREADS')}")
-        
         # Ensure PCA is computed
         if 'X_pca' not in adata.obsm:
             print("PCA not found. Computing PCA...")
             sc.tl.pca(adata)
-            
-        # Try harmony-pytorch first (works for both GPU and CPU if installed)
+        
+        # PRIORITY 1: rapids-singlecell (GPU, no OpenBLAS issues, fastest)
+        if self.use_gpu and is_rapids_available():
+            try:
+                import rapids_singlecell as rsc
+                print("Using rapids-singlecell.pp.harmony_integrate (GPU-accelerated)...")
+                
+                rsc.pp.harmony_integrate(
+                    adata,
+                    key=batch_key,
+                    basis='X_pca',
+                    adjusted_basis='X_pca_harmony',
+                    correction_method='fast',  # Faster improved method
+                    **kwargs
+                )
+                print("✓ Harmony integration complete (Provider: rapids-singlecell, GPU: True).")
+                return adata
+                
+            except Exception as e:
+                print(f"rapids-singlecell failed: {e}")
+                print("Falling back to harmony-pytorch...")
+        
+        # PRIORITY 2: harmony-pytorch (with thread safety)
         try:
             from harmony import harmonize
             use_gpu_flag = (device != 'cpu')
@@ -66,49 +94,46 @@ class HarmonyIntegration(IntegrationMethod):
             X = adata.obsm['X_pca']
             batch_mat = adata.obs[[batch_key]]
             
-            # Ensure X is numpy/torch array
-            if hasattr(X, 'get'): # Cupy
+            # Convert to numpy if needed
+            if hasattr(X, 'get'):  # CuPy array
                 X = X.get()
-            elif hasattr(X, 'to_numpy'): # DataFrame
+            elif hasattr(X, 'to_numpy'):  # DataFrame
                 X = X.to_numpy()
             
-            # Run harmonize
-            import traceback
+            # Enforce strict thread limits to prevent OpenBLAS crashes
             try:
-                # Enforce thread limit strictly during this call using threadpoolctl
-                # This is the most reliable way to prevent OpenBLAS segfaults
-                try:
-                    from threadpoolctl import threadpool_limits
-                    ctx = threadpool_limits(limits=1, user_api='blas')
-                except ImportError:
-                    # nullcontext if threadpoolctl missing
-                    from contextlib import nullcontext
-                    ctx = nullcontext()
-
-                with ctx:
-                    Z_corr = harmonize(X, batch_mat, batch_key=batch_key, use_gpu=use_gpu_flag, **kwargs)
-                
-                adata.obsm['X_pca_harmony'] = Z_corr
-                print(f"✓ Harmony integration complete (Provider: harmony-pytorch, GPU: {use_gpu_flag}).")
-                return adata
-            except Exception as inner_e:
-                print(f"  harmonize() call failed: {inner_e}")
-                traceback.print_exc()
-                raise inner_e
-
-        except ImportError:
-            # Fallback to Scanpy (needs harmonypy)
-            print("harmony-pytorch not found. Falling back to scanpy.external.pp.harmony_integrate...")
-            try:
-                sc.external.pp.harmony_integrate(
-                    adata, 
-                    key=batch_key, 
-                    basis='X_pca', 
-                    adjusted_basis='X_pca_harmony',
-                    **kwargs
-                )
-                print("✓ Harmony integration complete (Provider: Scanpy/harmonypy).")
-            except Exception as e:
-                raise RuntimeError(f"Harmony integration failed: {e}")
+                from threadpoolctl import threadpool_limits
+                thread_limit_ctx = threadpool_limits(limits=1, user_api='blas')
+            except ImportError:
+                print("Warning: threadpoolctl not found. Install with: pip install threadpoolctl")
+                from contextlib import nullcontext
+                thread_limit_ctx = nullcontext()
             
-        return adata
+            with thread_limit_ctx:
+                Z_corr = harmonize(X, batch_mat, batch_key=batch_key, use_gpu=use_gpu_flag, **kwargs)
+            
+            adata.obsm['X_pca_harmony'] = Z_corr
+            print(f"✓ Harmony integration complete (Provider: harmony-pytorch, GPU: {use_gpu_flag}).")
+            return adata
+            
+        except ImportError:
+            print("harmony-pytorch not found. Falling back to scanpy/harmonypy...")
+        except Exception as e:
+            print(f"harmony-pytorch failed: {e}")
+            print("Falling back to scanpy/harmonypy...")
+        
+        # PRIORITY 3: Scanpy fallback (CPU only, requires harmonypy)
+        try:
+            print("Using scanpy.external.pp.harmony_integrate (CPU)...")
+            sc.external.pp.harmony_integrate(
+                adata, 
+                key=batch_key, 
+                basis='X_pca', 
+                adjusted_basis='X_pca_harmony',
+                **kwargs
+            )
+            print("✓ Harmony integration complete (Provider: scanpy/harmonypy, CPU).")
+            return adata
+            
+        except Exception as e:
+            raise RuntimeError(f"All Harmony implementations failed. Last error: {e}")

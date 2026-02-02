@@ -16,5 +16,6 @@ src/integratore.egg-info/SOURCES.txt
 src/integratore.egg-info/dependency_links.txt
 src/integratore.egg-info/requires.txt
 src/integratore.egg-info/top_level.txt
+src/utils/env_setup.py
 src/utils/gpu.py
 src/visualization/plot.py
