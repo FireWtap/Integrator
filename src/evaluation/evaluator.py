@@ -128,6 +128,8 @@ class IntegrationEvaluator:
         
         print("  [Bio] Computing Isolated Labels...")
         try:
+            # Ensure proper types for isolated_labels
+            # scib-metrics might prefer categorical codes if strings fail
             iso_dict = isolated_labels(X_emb, labels, batch, rescale=True, iso_threshold=None)
             results['Bio_Iso_F1'] = iso_dict['isolated_labels_f1']
             results['Bio_Iso_ASW'] = iso_dict['isolated_labels_asw']
@@ -140,8 +142,8 @@ class IntegrationEvaluator:
 
         print("  [Bio] Computing cLISI...")
         try:
-            # Use indices without the cell itself (k=1 is the cell itself)
-            results['Bio_cLISI'] = clisi_knn(neighbors.indices[:, 1:], labels)
+            # FIXED: Pass neighbors object, not just indices
+            results['Bio_cLISI'] = clisi_knn(neighbors, labels)
             print(f"    ✓ {results['Bio_cLISI']:.3f}")
         except Exception as e:
             print(f"    ✗ Failed: {e}")
@@ -159,7 +161,8 @@ class IntegrationEvaluator:
         
         print("  [Batch] Computing iLISI...")
         try:
-            results['Batch_iLISI'] = ilisi_knn(neighbors.indices[:, 1:], batch)
+            # FIXED: Pass neighbors object, not just indices
+            results['Batch_iLISI'] = ilisi_knn(neighbors, batch)
             print(f"    ✓ {results['Batch_iLISI']:.3f}")
         except Exception as e:
             print(f"    ✗ Failed: {e}")
